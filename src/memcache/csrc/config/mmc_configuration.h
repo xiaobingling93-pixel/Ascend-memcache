@@ -38,6 +38,7 @@ constexpr uint64_t HBM_SIZE_ALIGNMENT = 2097152;  // 2MB
 const std::string BOOL_ENUM_STR = "false||true";
 const std::string LOG_LEVEL_ENUM_STR = "debug||info||warn||error";
 const std::string LOCAL_SERVER_PROTOCAL_ENUM_STR = "host_rdma||host_urma||host_tcp||device_rdma||device_sdma";
+const std::string MEM_POOL_MODE_ENUM_STR = "standard||expanded";
 
 // 定义单位与字节的转换关系
 enum class MemUnit { B, KB, MB, GB, TB, UNKNOWN };
@@ -275,6 +276,8 @@ public:
         AddStrConf(OKC_MMC_LOCAL_SERVICE_MAX_DRAM_SIZE, VNoCheck::Create(), 0);
         AddStrConf(OKC_MMC_LOCAL_SERVICE_HBM_SIZE, VNoCheck::Create(), 1); // REQUIRED
         AddStrConf(OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE, VNoCheck::Create(), 0);
+        AddStrConf(OKC_MMC_LOCAL_SERVICE_MEMORY_POOL_MODE,
+                   VStrEnum::Create(OKC_MMC_LOCAL_SERVICE_MEMORY_POOL_MODE.first, MEM_POOL_MODE_ENUM_STR), 0);
 
         // HCOM TLS config
         AddStrConf(OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL, VNoCheck::Create(), 0);
@@ -320,6 +323,8 @@ public:
             GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_DRAM_SIZE.first, config.localDRAMSize);
         config.localHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_HBM_SIZE.first, MEM_2MB_BYTES);
         config.localMaxHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE.first, config.localHBMSize);
+        SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_MEMORY_POOL_MODE), config.memoryPoolMode,
+                 MEM_POOL_MODE_SIZE);
         auto protocol = std::string(config.dataOpType);
         std::string logLevelStr = GetString(ConfConstant::OCK_MMC_LOG_LEVEL);
         StringToUpper(logLevelStr);
@@ -348,7 +353,7 @@ public:
     static Result ValidateLocalServiceConfig(mmc_local_service_config_t &config)
     {
         constexpr uint64_t GB_SIZE_ALIGNMENT = 1073741824; // 1GB
-        uint64_t alignment = DRAM_SIZE_ALIGNMENT; // 默认 2MB 对齐
+        uint64_t alignment = DRAM_SIZE_ALIGNMENT;          // 默认 2MB 对齐
         std::string protocol(config.dataOpType);
 
         if (protocol == "device_rdma" || protocol == "device_sdma") {
@@ -356,13 +361,14 @@ public:
         }
 
         MMC_LOG_DEBUG("Before alignment " << (alignment == GB_SIZE_ALIGNMENT ? "1GB" : "2MB")
-                                         << ", ock.mmc.local_service.dram.size is " << config.localDRAMSize
-                                         << ", ock.mmc.local_service.max.dram.size is " << config.localMaxDRAMSize
-                                         << ", ock.mmc.local_service.hbm.size is " << config.localHBMSize
-                                         << ", ock.mmc.local_service.max.hbm.size is " << config.localMaxHBMSize);
+                                          << ", ock.mmc.local_service.dram.size is " << config.localDRAMSize
+                                          << ", ock.mmc.local_service.max.dram.size is " << config.localMaxDRAMSize
+                                          << ", ock.mmc.local_service.hbm.size is " << config.localHBMSize
+                                          << ", ock.mmc.local_service.max.hbm.size is " << config.localMaxHBMSize);
 
         auto align_up = [](uint64_t size, uint64_t align) {
-            if (size == 0) return size;
+            if (size == 0)
+                return size;
             return (size + align - 1) / align * align;
         };
 

@@ -104,6 +104,7 @@ Result MmcBmProxy::InternalCreateBm(const mmc_bm_create_config_t &createConfig)
     option.localDRAMSize = createConfig.localDRAMSize;
     option.localHBMSize = createConfig.localHBMSize;
     option.dataOpType = opType;
+    option.isSecondMapping = createConfig.memoryPoolMode == "expanded";
     option.flags = createConfig.flags;
     option.tag[0] = '\0';
     option.tagOpInfo[0] = '\0';

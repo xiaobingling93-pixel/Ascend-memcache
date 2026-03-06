@@ -42,6 +42,7 @@ typedef struct {
     uint64_t localMaxDRAMSize;
     uint64_t localHBMSize;
     uint64_t localMaxHBMSize;
+    std::string memoryPoolMode;
     uint32_t flags;
 } mmc_bm_create_config_t;
 
