@@ -274,7 +274,7 @@ public:
                    1);                                                      // REQUIRED
         AddStrConf(OKC_MMC_LOCAL_SERVICE_DRAM_SIZE, VNoCheck::Create(), 1); // REQUIRED
         AddStrConf(OKC_MMC_LOCAL_SERVICE_MAX_DRAM_SIZE, VNoCheck::Create(), 0);
-        AddStrConf(OKC_MMC_LOCAL_SERVICE_HBM_SIZE, VNoCheck::Create(), 1); // REQUIRED
+        AddStrConf(OKC_MMC_LOCAL_SERVICE_HBM_SIZE, VNoCheck::Create(), 0);
         AddStrConf(OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE, VNoCheck::Create(), 0);
         AddStrConf(OKC_MMC_LOCAL_SERVICE_MEMORY_POOL_MODE,
                    VStrEnum::Create(OKC_MMC_LOCAL_SERVICE_MEMORY_POOL_MODE.first, MEM_POOL_MODE_ENUM_STR), 0);
@@ -318,10 +318,10 @@ public:
         SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL), config.bmHcomUrl, DISCOVERY_URL_SIZE);
         config.createId = 0;
         SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_PROTOCOL), config.dataOpType, PROTOCOL_SIZE);
-        config.localDRAMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_DRAM_SIZE.first, MEM_128MB_BYTES);
+        config.localDRAMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_DRAM_SIZE.first, GB_MEM_BYTES);
         config.localMaxDRAMSize =
             GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_DRAM_SIZE.first, config.localDRAMSize);
-        config.localHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_HBM_SIZE.first, MEM_2MB_BYTES);
+        config.localHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_HBM_SIZE.first, 0);
         config.localMaxHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE.first, config.localHBMSize);
         SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_MEMORY_POOL_MODE), config.memoryPoolMode,
                  MEM_POOL_MODE_SIZE);
