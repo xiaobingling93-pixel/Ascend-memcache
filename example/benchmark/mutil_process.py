@@ -21,8 +21,9 @@ from status_file_manager import StatusFileManager
 
 g_local_type = "npu"
 
+# the block size of 128 token, the model is deepseek r1 w8a8
 layers_num = 61
-k_size = 64 * 1024
+k_size = 128 * 1024
 v_size = 16 * 1024
 k_sizes = [k_size for _ in range(layers_num)]
 v_sizes = [v_size for _ in range(layers_num)]
@@ -59,7 +60,8 @@ def allocate_aligned_tensor(shape, dtype=torch.float32, alignment=2*1024*1024):
     offset = (aligned_address - address) // element_size
 
     aligned_tensor = buffer[offset:offset + num_elements].view(*shape)
-    print(f"Aligned tensor address: {aligned_tensor.data_ptr():x}")
+    print(f"==== Aligned tensor address: {aligned_tensor.data_ptr():x}, {num_elements=}, "
+          f"{element_size=}, {total_bytes=}, {dtype=}, {shape=}")
     return aligned_tensor
 
 
@@ -116,9 +118,6 @@ def write_worker(*args):
     status_manager[device_id].reset_to_preparing()
 
     print(f"npu:{device_id} 开始，PID: {os.getpid()}")
-    continus_tensor = malloc_npu_blocks(max(block_size, default=0), 1, batch_size)
-    k_tensors = malloc_npu_blocks(max(k_sizes, default=0), len(k_sizes), batch_size)
-    v_tensors = malloc_npu_blocks(max(v_sizes, default=0), len(v_sizes), batch_size)
     if backend == "mooncake":
         store = init_mooncake(device_id)
         print(f"==== Start to init mooncake device:{device_id}")
@@ -130,9 +129,17 @@ def write_worker(*args):
         if res != 0:
             raise f"Failed to start pid:{os.getpid()} deviceId:{device_id}"
     print(f"==== Success to init device:{device_id}")
-    store.register_buffer(continus_tensor.data_ptr(), max(block_size, default=0) * batch_size)
-    store.register_buffer(k_tensors.data_ptr(), max(k_sizes, default=0) * len(k_sizes) * batch_size)
-    store.register_buffer(v_tensors.data_ptr(), max(v_sizes, default=0) * len(v_sizes) * batch_size)
+    one_dim_tensor = None
+    k_tensors = None
+    v_tensors = None
+    if data_dim == 2:
+        k_tensors = malloc_npu_blocks(max(k_sizes, default=0), len(k_sizes), batch_size)
+        v_tensors = malloc_npu_blocks(max(v_sizes, default=0), len(v_sizes), batch_size)
+        store.register_buffer(k_tensors.data_ptr(), max(k_sizes, default=0) * len(k_sizes) * batch_size)
+        store.register_buffer(v_tensors.data_ptr(), max(v_sizes, default=0) * len(v_sizes) * batch_size)
+    else:
+        one_dim_tensor = malloc_npu_blocks(max(block_size, default=0), 1, batch_size)
+        store.register_buffer(one_dim_tensor.data_ptr(), max(block_size, default=0) * batch_size)
     keys_list = []
     buffs_list = []
     sizes_list = []    
@@ -149,7 +156,7 @@ def write_worker(*args):
                                                     for item in pair]
                 sizes.append(layers_block_size)
             else:
-                block_buffs = get_col_tensors_ptr_by_index(continus_tensor, 1, j)
+                block_buffs = get_col_tensors_ptr_by_index(one_dim_tensor, 1, j)
                 sizes.append(block_size)
             buffs.append(block_buffs)
         keys_list.append(keys)
@@ -164,7 +171,9 @@ def write_worker(*args):
     print(f"===== npu:{device_id} begin on {start} ......")
 
     for keys, buffs, sizes in zip(keys_list, buffs_list, sizes_list):
-        ret = store.batch_put_from_layers(keys, buffs, sizes, 0)
+        write_ret = store.batch_put_from_layers(keys, buffs, sizes, 0)
+        if any(x != 0 for x in write_ret):
+            raise f"Failed to put pid:{os.getpid()} deviceId:{device_id}"
 
     print(f"===== npu:{device_id} finish on {time.perf_counter()} ......")
     status_manager[device_id].reset_to_preparing()
@@ -182,6 +191,9 @@ def write_worker(*args):
           f"total_time:{duration_us:.2f} us, avg_time:{duration_us / call_count:.2f} us, "
           f"bw:{bandwidth_gb_per_sec:.3f} GB/s\033[0m")
 
+    status_manager[device_id].set_to_ready()
+    for i in range(process_count):
+        status_manager[i].wait_until_ready(timeout=5 * 60)
     print(f"===== npu:{device_id} write finish, wait read testing ......")
     sleep(30 * 60)
 
@@ -204,24 +216,27 @@ def read_worker(*args):
     status_manager[device_id].reset_to_preparing()
     sleep(5)
     print(f"npu:{device_id} 开始，PID: {os.getpid()}")
-    continus_tensor = malloc_npu_blocks(max(block_size, default=0), 1, batch_size)
-    k_tensors = malloc_npu_blocks(max(k_sizes, default=0), len(k_sizes), batch_size)
-    v_tensors = malloc_npu_blocks(max(v_sizes, default=0), len(v_sizes), batch_size)
-    
     if backend == "mooncake":
         store = init_mooncake(device_id)
         print(f"==== Start to init mooncake device:{device_id}")
     else:
-        from memcache_hybrid import DistributedObjectStore
         store = DistributedObjectStore()
         print(f"==== Start to init memcache device:{device_id}")
         res = store.init(device_id)
         if res != 0:
             raise f"Failed to start pid:{os.getpid()} deviceId:{device_id}"
     print(f"==== Success to init device:{device_id}")
-    store.register_buffer(continus_tensor.data_ptr(), max(block_size, default=0) * batch_size)
-    store.register_buffer(k_tensors.data_ptr(), max(k_sizes, default=0) * len(k_sizes) * batch_size)
-    store.register_buffer(v_tensors.data_ptr(), max(v_sizes, default=0) * len(v_sizes) * batch_size)
+    one_dim_tensor = None
+    k_tensors = None
+    v_tensors = None
+    if data_dim == 2:
+        k_tensors = malloc_npu_blocks(max(k_sizes, default=0), len(k_sizes), batch_size)
+        v_tensors = malloc_npu_blocks(max(v_sizes, default=0), len(v_sizes), batch_size)
+        store.register_buffer(k_tensors.data_ptr(), max(k_sizes, default=0) * len(k_sizes) * batch_size)
+        store.register_buffer(v_tensors.data_ptr(), max(v_sizes, default=0) * len(v_sizes) * batch_size)
+    else:
+        one_dim_tensor = malloc_npu_blocks(max(block_size, default=0), 1, batch_size)
+        store.register_buffer(one_dim_tensor.data_ptr(), max(block_size, default=0) * batch_size)
     if g_local_type == "npu":
         direct_t = 1
     else:
@@ -243,7 +258,7 @@ def read_worker(*args):
                                                     for item in pair]
                 sizes.append(layers_block_size)
             else:
-                block_buffs = get_col_tensors_ptr_by_index(continus_tensor, 1, j)
+                block_buffs = get_col_tensors_ptr_by_index(one_dim_tensor, 1, j)
                 sizes.append(block_size)
             buffs.append(block_buffs)
         
@@ -258,7 +273,9 @@ def read_worker(*args):
     start = time.perf_counter()
     print(f"===== npu:{device_id} begin on {start} ......")
     for keys, buffs, sizes in zip(keys_list, buffs_list, sizes_list):
-        ret = store.batch_get_into_layers(keys, buffs, sizes, direct_t)
+        read_ret = store.batch_get_into_layers(keys, buffs, sizes, direct_t)
+        if any(x != 0 for x in read_ret):
+            raise f"Failed to get pid:{os.getpid()} deviceId:{device_id}"
     print(f"===== npu:{device_id} finish on {time.perf_counter()} ......")
 
     status_manager[device_id].reset_to_preparing()
