@@ -89,7 +89,7 @@ constexpr int MIN_WORLD_SIZE = 1;
 constexpr int MAX_WORLD_SIZE = 1024;
 
 constexpr int MIN_EVICT_THRESHOLD = 1;
-constexpr int MAX_EVICT_THRESHOLD = 100;
+constexpr int MAX_EVICT_THRESHOLD = 99;
 
 constexpr int MIN_RETRY_MS = 0;
 constexpr int MAX_RETRY_MS = 600000;

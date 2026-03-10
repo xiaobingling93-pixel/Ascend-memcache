@@ -220,6 +220,7 @@ def read_worker(*args):
         store = init_mooncake(device_id)
         print(f"==== Start to init mooncake device:{device_id}")
     else:
+        from memcache_hybrid import DistributedObjectStore
         store = DistributedObjectStore()
         print(f"==== Start to init memcache device:{device_id}")
         res = store.init(device_id)
