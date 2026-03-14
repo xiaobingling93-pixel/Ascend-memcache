@@ -223,6 +223,10 @@ Result MmcMetaManager::Remove(const std::string &key)
 {
     MmcMemObjMetaPtr objMeta;
     MMC_RETURN_ERROR(metaContainer_->Erase(key, objMeta), "remove: Fail to erase from container!");
+    if (objMeta == nullptr) {
+        MMC_LOG_ERROR("Erase returned null objMeta for key: " << key);
+        return MMC_ERROR;
+    }
     std::unique_lock<std::mutex> guard(objMeta->Mutex());
     PushRemoveList(key, objMeta);
 
@@ -233,6 +237,10 @@ Result MmcMetaManager::Remove(const std::string &key)
 Result MmcMetaManager::RemoveAll()
 {
     auto removeFunc = [this](const std::string &key, const MmcMemObjMetaPtr &objMeta) -> void {
+        if (objMeta == nullptr) {
+            MMC_LOG_ERROR("objMeta is null in RemoveAll for key: " << key);
+            return;
+        }
         std::unique_lock<std::mutex> guard(objMeta->Mutex());
         this->PushRemoveList(key, objMeta);
     };
@@ -547,12 +555,12 @@ Result MmcMetaManager::ReplicateBlob(const std::string &key, const MmcLocation &
 
 EvictResult MmcMetaManager::EvictCallBackFunction(const std::string &key, const MmcMemObjMetaPtr &objMeta)
 {
-    std::unique_lock<std::mutex> guard(objMeta->Mutex());
-
     if (objMeta == nullptr) {
         MMC_LOG_ERROR("objMeta is null");
         return EvictResult::FAIL;
     }
+
+    std::unique_lock<std::mutex> guard(objMeta->Mutex());
 
     MediaType dstMedium = objMeta->MoveTo(true);
     MediaType srcMedium = MoveUp(dstMedium);

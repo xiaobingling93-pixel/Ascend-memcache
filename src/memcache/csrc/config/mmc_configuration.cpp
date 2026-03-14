@@ -13,6 +13,7 @@
 #include "mmc_configuration.h"
 
 #include <iostream>
+#include <limits>
 #include <mmc_functions.h>
 
 #include "smem.h"
@@ -536,6 +537,37 @@ int Configuration::ValidateLogPathConfig(const std::string &logPath)
     return MMC_OK;
 }
 
+// 判断 value * factor 是否超过 uint64_t 上限，用于 ParseMemSize 溢出检查
+static bool WillMemSizeOverflow(double value, uint64_t factor)
+{
+    if (value <= 0) {
+        return false;
+    }
+    long double maxVal = static_cast<long double>(std::numeric_limits<uint64_t>::max());
+    long double f = static_cast<long double>(factor);
+    long double v = static_cast<long double>(value);
+    return v > maxVal / f;
+}
+
+// 单位对应的字节因子
+static uint64_t GetMemUnitFactor(MemUnit unit)
+{
+    switch (unit) {
+        case MemUnit::B:
+            return 1U;
+        case MemUnit::KB:
+            return KB_MEM_BYTES;
+        case MemUnit::MB:
+            return MB_MEM_BYTES;
+        case MemUnit::GB:
+            return GB_MEM_BYTES;
+        case MemUnit::TB:
+            return TB_MEM_BYTES;
+        default:
+            return 0;
+    }
+}
+
 uint64_t Configuration::ParseMemSize(const std::string &memStr)
 {
     if (memStr.empty()) {
@@ -547,7 +579,6 @@ uint64_t Configuration::ParseMemSize(const std::string &memStr)
     while (i < memStr.size() && (isdigit(memStr[i]) || memStr[i] == '.')) {
         i++;
     }
-
     // 提取数值部分
     std::string numStr = memStr.substr(0, i);
     double num;
@@ -560,31 +591,14 @@ uint64_t Configuration::ParseMemSize(const std::string &memStr)
     // 提取单位部分
     std::string unitStr = (i < memStr.size()) ? memStr.substr(i) : "b";
     OckTrimString(unitStr);
-    MemUnit unit = ParseMemUnit(unitStr);
-
-    // 转换为字节数
-    uint64_t bytes;
-    switch (unit) {
-        case MemUnit::B:
-            bytes = static_cast<uint64_t>(num);
-            break;
-        case MemUnit::KB:
-            bytes = static_cast<uint64_t>(num * KB_MEM_BYTES);
-            break;
-        case MemUnit::MB:
-            bytes = static_cast<uint64_t>(num * MB_MEM_BYTES);
-            break;
-        case MemUnit::GB:
-            bytes = static_cast<uint64_t>(num * GB_MEM_BYTES);
-            break;
-        case MemUnit::TB:
-            bytes = static_cast<uint64_t>(num * TB_MEM_BYTES);
-            break;
-        default:
-            bytes = UINT64_MAX;
+    uint64_t factor = GetMemUnitFactor(ParseMemUnit(unitStr));
+    if (factor == 0) {
+        return UINT64_MAX;
     }
-
-    return bytes;
+    if (WillMemSizeOverflow(num, factor)) {
+        return UINT64_MAX;
+    }
+    return static_cast<uint64_t>(num * factor);
 }
 
 // 转换字符串单位到枚举
