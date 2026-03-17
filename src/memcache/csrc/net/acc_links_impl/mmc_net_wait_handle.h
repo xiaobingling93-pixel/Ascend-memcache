@@ -53,6 +53,7 @@ public:
         auto err = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
         if (UNLIKELY(err != 0)) {
             MMC_LOG_ERROR("Failed to init pthread condition, error " << err);
+            pthread_condattr_destroy(&attr);
             return MMC_ERROR;
         }
 

@@ -1034,11 +1034,13 @@ Result MmcClientDefault::PutData2Blobs(const std::vector<std::string> &keys, con
 
 Result MmcClientDefault::RegisterBuffer(uint64_t addr, uint64_t size)
 {
+    MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     return bmProxy_->RegisterBuffer(addr, size);
 }
 
 Result MmcClientDefault::UnRegisterBuffer(uint64_t addr, uint64_t size)
 {
+    MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     return bmProxy_->UnRegisterBuffer(addr);
 }
 
