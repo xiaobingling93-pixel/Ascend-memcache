@@ -10,17 +10,16 @@
 # MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 # See the Mulan PSL v2 for more details.
 
-"""python api for memcache_hybrid."""
+"""Python bindings for memcache_hybrid implemented with pybind11"""
 
-import os
-import sys
-import platform
 import glob
+import os
+import platform
 import subprocess
-from setuptools import setup
-from setuptools import find_namespace_packages
-from setuptools.dist import Distribution
+
+from setuptools import find_namespace_packages, setup
 from setuptools.command.build_ext import build_ext
+from setuptools.dist import Distribution
 from wheel.bdist_wheel import bdist_wheel
 
 
@@ -111,18 +110,28 @@ class CMakeBuildExt(build_ext):
         super().build_extension(ext)
 
 
+with open("../../../README.md", "r", encoding="utf-8") as f:
+    long_description = f.read()
+
 setup(
     name="memcache_hybrid",
     version=current_version,
     author="",
     author_email="",
-    description="python api for memcache_hybrid",
+    description="Python bindings for memcache_hybrid implemented with pybind11",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     packages=find_namespace_packages(exclude=("tests*",)),
     url="https://gitcode.com/Ascend/memcache",
     license="Mulan PSL v2",
-    python_requires=">=3.7",
+    python_requires=">=3.10,<3.14",
+    install_requires=[
+        "memfabric_hybrid>=1.1.0",
+    ],
     zip_safe=False,
-    package_data={"memcache_hybrid": ["_pymmc.cpython*.so", "lib/**", "config/**", "VERSION"]},
+    package_data={
+        "memcache_hybrid": ["_pymmc.cpython*.so", "lib/**", "config/**", "VERSION"]
+    },
     cmdclass={
         "build_ext": CMakeBuildExt,
         "bdist_wheel": BuildWheel,
