@@ -70,8 +70,7 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
     NetEngineOptions configStoreOpt{};
     NetEngineOptions::ExtractIpPortFromUrl(options_.configStoreURL, configStoreOpt);
     smem::StoreFactory::SetTlsInfo(MmcSmemBmHelper::TransSmemTlsConfig(options_.configStoreTlsConfig));
-    confStore_ = smem::StoreFactory::CreateStoreServer(configStoreOpt.ip, configStoreOpt.port,
-                                                       std::numeric_limits<uint32_t>::max());
+    confStore_ = ock::smem::StoreFactory::CreateStoreByUrl(options_.configStoreURL, true);
     MMC_VALIDATE_RETURN(confStore_ != nullptr, "Failed to start config store server", MMC_ERROR);
 
     started_ = true;
