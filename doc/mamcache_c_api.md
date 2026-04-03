@@ -47,7 +47,43 @@ void mmcs_local_service_stop(mmc_local_service_t handle);
 **参数**:
 - `handle`: 本地服务句柄
 
-### 2. 客户端初始化和反初始化
+### 2. SDK初始化和反初始化
+
+#### mmc_setup
+```c
+int32_t mmc_setup(const local_config *config);
+```
+**功能**: 初始化并校验本地配置，供后续 `mmc_init` 使用。
+
+**参数**:
+- `config`: 本地配置（`local_config`）
+
+**返回值**:
+- `0`: 成功
+- 其他: 失败
+
+#### mmc_init
+```c
+int32_t mmc_init(const mmc_init_config *config);
+```
+**功能**: 初始化MemCache运行环境（只读客户端和可选local service）。
+
+**参数**:
+- `config`: 初始化参数（`mmc_init_config`）
+    - `deviceId`: 设备ID
+    - `initBm`: 是否初始化本地服务并提供内存（`true` 启用，`false` 只读客户端）
+
+**返回值**:
+- `0`: 成功
+- 其他: 失败
+
+#### mmc_uninit
+```c
+void mmc_uninit(void);
+```
+**功能**: 反初始化MemCache运行环境，释放相关资源。
+
+### 3. 客户端底层初始化和反初始化（兼容接口）
 
 #### mmcc_init
 ```c
@@ -68,7 +104,7 @@ void mmcc_uninit();
 ```
 **功能**: 反初始化客户端，释放相关资源。
 
-### 3. 数据操作接口
+### 4. 数据操作接口
 
 #### mmcc_register_buffer
 ```c
@@ -274,7 +310,7 @@ int32_t mmcc_batch_get(const char **keys, uint32_t keys_count, mmc_buffer *bufs,
 - `0`: 成功
 - 其他: 失败
 
-### 4. 日志设置接口
+### 5. 日志设置接口
 
 #### mmc_set_extern_logger
 ```c
@@ -437,5 +473,6 @@ TLS配置结构体，包含以下字段：
 
 ## 注意事项
 
+- 推荐调用顺序：`mmc_setup` -> `mmc_init` -> 数据读写接口 -> `mmc_uninit`
 - 所有键的长度必须小于256个字节
 - 批量操作可以提高处理效率

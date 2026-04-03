@@ -5,6 +5,32 @@ C++语言接口功能齐全，基于面向对象设计，提供统一的 `Object
 
 ### 1. 实例创建与生命周期管理接口
 
+#### local_config
+`local_config` 是 `Setup` 接口使用的本地配置类型，定义位于 `src/memcache/include/mmc.h`。
+
+**说明**:
+- 建议先通过 `create_default_local_config()` 获取带默认值的配置对象，再按需覆盖字段
+
+**常用字段**:
+- `meta_service_url`: 元服务地址
+- `config_store_url`: 配置存储服务地址
+- `log_level`: 日志级别，如 `debug`、`info`、`warn`、`error`
+- `world_size`: 最大 rank 数
+- `protocol`: 数据传输协议，如 `host_rdma`、`host_urma`、`host_tcp`、`device_rdma`、`device_sdma`
+- `hcom_url`: HCOM 服务地址
+- `dram_size` / `hbm_size`: 本地服务 DRAM / HBM 容量
+- `max_dram_size` / `max_hbm_size`: 所有本地进程可使用的 DRAM / HBM 总上限
+- `memory_pool_mode`: 内存池模式，可选 `standard` / `expanded`
+
+#### create_default_local_config
+```c++
+local_config create_default_local_config();
+```
+**功能**: 创建一个带内置默认值的 `local_config` 对象，便于用户只覆盖必要配置项。
+
+**返回值**:
+- 返回默认初始化后的 `local_config`
+
 #### ObjectStore::CreateObjectStore
 ```c++
 static std::shared_ptr<ObjectStore> CreateObjectStore();
@@ -13,6 +39,36 @@ static std::shared_ptr<ObjectStore> CreateObjectStore();
 
 **返回值**:
 - 返回 std::shared_ptr 管理的智能指针，确保资源自动释放，非空 shared_ptr 表示成功。
+
+#### Setup
+```c++
+virtual int Setup(const local_config &config) = 0;
+```
+**功能**: 初始化并校验本地配置，供后续 `Init` 使用。
+
+**参数**:
+- `config`: 本地配置（`local_config`）
+
+**返回值**:
+- `0`：成功
+- 其他：失败
+
+**推荐调用顺序**:
+```c++
+auto store = ock::mmc::ObjectStore::CreateObjectStore();
+local_config config = create_default_local_config();
+
+// 可按需覆盖默认配置，或仅设置 config_path 指向配置文件
+int ret = store->Setup(config);
+if (ret != 0) {
+    return ret;
+}
+
+ret = store->Init(0, true);
+if (ret != 0) {
+    return ret;
+}
+```
 
 #### Init
 ```c++

@@ -1,242 +1,165 @@
-### Python接口
+# MemCache Python API 文档
 
-安装完成run包并source安装路径下的set_env.sh后，即可在python中通过
+## 概述
+
+MemCache Python API 是一个高性能的分布式内存缓存客户端，提供了丰富的接口用于数据的存储、检索和管理。该API基于C++核心实现，通过Python绑定提供了简洁易用的接口，支持多种数据传输协议和内存管理模式，适用于大规模分布式计算环境。
+
+### 主要特性
+
+- 支持多种传输协议（TCP、RDMA、SDMA等）
+- 支持主机内存（DRAM）和设备内存（HBM）
+- 提供批量操作接口，提高处理效率
+- 支持数据副本和分层存储
+- 提供灵活的配置选项
+- 支持TLS加密通信
+
+### 适用场景
+
+- 大规模分布式训练中的数据共享
+- 高性能计算环境中的数据缓存
+- 需要低延迟数据访问的应用场景
+- 跨进程、跨节点的数据交换
+
+## 安装指南
+
+### 前提条件
+
+- Python 3.11 环境（支持源码编译，Python >= 3.11）
+- 支持的操作系统：Linux
+
+### 安装步骤
+
+从PyPI安装memcache_hybrid包，该包包含了完整的Python绑定：
+
+```bash
+pip install memcache_hybrid
+```
+
+📦 包详情: https://pypi.org/project/memcache_hybrid/
+
+
+## 核心接口
+
+### 接口概述
+
+Python接口封装了MemCache的客户端功能，使用前需要配置并启动独立的meta service进程。
+
+### MetaService 类
+
+MetaService是MemCache的元数据服务类，提供了直接从Python启动元数据服务的功能。元数据服务负责管理缓存键值对的元数据、维护集群状态和处理客户端请求路由。
+
+#### main
 
 ```python
-from memcache_hybrid import DistributedObjectStore
+MetaService.main()
 ```
 
-DistributedObjectStore类，然后调用python接口
+**功能**: 直接启动元数据服务进程。这是一个阻塞调用，直到服务停止才会返回。
 
-### python接口文档
+**参数**: 无
 
-```shell
-pydoc memcache_hybrid
+**返回值**: 无返回值。服务正常运行时会一直阻塞，服务异常退出时会抛出异常。
+
+**异常处理**: 
+- 服务启动失败时会抛出RuntimeError异常，包含具体错误信息
+- 服务运行过程中遇到致命错误时会抛出RuntimeError异常
+- 服务被信号中断时会抛出KeyboardInterrupt异常
+
+**使用示例**:
+
+```python
+import os
+from memcache_hybrid import MetaService
+
+os.environ["MMC_META_CONFIG_PATH"] = "/path/to/meta_config.conf"
+
+# 直接启动元数据服务
+# 注意：这是一个阻塞调用，会一直运行直到服务停止
+print("Starting MetaService...")
+try:
+    MetaService.main()
+except KeyboardInterrupt:
+    print("MetaService stopped by user")
+except RuntimeError as e:
+    print(f"MetaService failed to start or encountered an error: {e}")
 ```
 
-结果如下
+**注意事项**:
+- 此方法是一个阻塞调用，调用后会一直运行直到服务停止
+- 建议在单独的进程中运行元数据服务，避免影响主应用程序
+- 元数据服务需要足够的系统资源（内存、CPU）来正常运行
+- 服务停止后，所有依赖该服务的客户端连接将失效
+- 生产环境中建议使用配置文件进行详细配置，或通过命令行启动服务
 
-```text
-Help on package memcache_hybrid:
+### LocalConfig 类
 
-NAME
-    memcache_hybrid
+LocalConfig是分布式内存缓存的配置类，用于设置客户端的各种参数。
 
-DESCRIPTION
-    # coding=utf-8
-    # Copyright (c) Huawei Technologies Co., Ltd. 2025-2026. All rights reserved.
+**功能**: 创建和管理客户端配置
 
-PACKAGE CONTENTS
-    _pymmc
-    meta_service_leader_election
+**参数说明**:
 
-CLASSES
-    pybind11_builtins.pybind11_object(builtins.object)
-        _pymmc.DistributedObjectStore
-        _pymmc.KeyInfo
-        _pymmc.MetaService
-        _pymmc.ReplicateConfig
+| 参数名称 | 类型 | 默认值 | 说明 |
+|---------|------|-------|------|
+| meta_service_url | str | "tcp://127.0.0.1:5000" | Meta service的URL地址，格式如"tcp://192.168.1.1:5000" |
+| config_store_url | str | "tcp://127.0.0.1:6000" | Config store的URL地址 |
+| log_level | str | "info" | 日志级别：debug, info, warn, error |
+| world_size | int | 256 | 最大支持的rank数量 |
+| protocol | str | "host_rdma" | 数据传输协议：host_rdma, host_urma, host_tcp, device_rdma, device_sdma |
+| hcom_url | str | "tcp://127.0.0.1:7000" | HCOM URL for RDMA network |
+| dram_size | str | "1GB" | DRAM空间使用，支持格式如1GB, 2MB等 |
+| hbm_size | str | "0" | HBM空间使用 |
+| max_dram_size | str | "64GB" | 所有本地进程中dram_size的最大值 |
+| max_hbm_size | str | "0" | 所有本地进程中hbm_size的最大值 |
+| client_retry_milliseconds | int | 0 | 客户端请求meta service时的总重试时间(毫秒) |
+| client_timeout_seconds | int | 60 | 客户端请求超时时间(秒) |
+| read_thread_pool_size | int | 32 | 读线程池大小 |
+| write_thread_pool_size | int | 4 | 写线程池大小 |
+| aggregate_io | bool | true | 是否启用读/写聚合 |
+| aggregate_num | int | 122 | 聚合数量 |
+| ubs_io_enable | bool | false | 是否启用UBS_IO |
+| memory_pool_mode | str | "standard" | 内存池模式：standard或expanded |
+| tls_enable | bool | false | 是否为metaservice启用TLS |
+| tls_ca_path | str | "" | TLS CA证书路径 |
+| tls_ca_crl_path | str | "" | TLS CA CRL路径 |
+| tls_cert_path | str | "" | TLS证书路径 |
+| tls_key_path | str | "" | TLS密钥路径 |
+| tls_key_pass_path | str | "" | TLS密钥密码路径 |
+| tls_package_path | str | "" | TLS包路径 |
+| tls_decrypter_path | str | "" | TLS解密库路径 |
+| config_store_tls_enable | bool | false | 是否为config_store启用TLS |
+| config_store_tls_ca_path | str | "" | Config store TLS CA证书路径 |
+| config_store_tls_ca_crl_path | str | "" | Config store TLS CA CRL路径 |
+| config_store_tls_cert_path | str | "" | Config store TLS证书路径 |
+| config_store_tls_key_path | str | "" | Config store TLS密钥路径 |
+| config_store_tls_key_pass_path | str | "" | Config store TLS密钥密码路径 |
+| config_store_tls_package_path | str | "" | Config store TLS包路径 |
+| config_store_tls_decrypter_path | str | "" | Config store TLS解密库路径 |
+| hcom_tls_enable | bool | false | 是否为HCOM启用TLS |
+| hcom_tls_ca_path | str | "" | HCOM TLS CA证书路径 |
+| hcom_tls_ca_crl_path | str | "" | HCOM TLS CA CRL路径 |
+| hcom_tls_cert_path | str | "" | HCOM TLS证书路径 |
+| hcom_tls_key_path | str | "" | HCOM TLS密钥路径 |
+| hcom_tls_key_pass_path | str | "" | HCOM TLS密钥密码路径 |
+| hcom_tls_decrypter_path | str | "" | HCOM TLS解密库路径 |
 
-    class DistributedObjectStore(pybind11_builtins.pybind11_object)
-     |  Method resolution order:
-     |      DistributedObjectStore
-     |      pybind11_builtins.pybind11_object
-     |      builtins.object
-     |
-     |  Methods defined here:
-     |
-     |  __init__(...)
-     |      __init__(self: _pymmc.DistributedObjectStore) -> None
-     |
-     |  batch_get_into(...)
-     |      batch_get_into(self: _pymmc.DistributedObjectStore, keys: List[str], buffer_ptrs: List[int], sizes: List[int], direct: int = <BmCopyType.G2H: 2>) -> List[int]
-     |
-     |      Get object data directly into pre-allocated buffers for multiple keys
-     |
-     |  batch_get_into_layers(...)
-     |      batch_get_into_layers(self: _pymmc.DistributedObjectStore, keys: List[str], buffer_ptrs: List[List[int]], sizes: List[List[int]], direct: int = <BmCopyType.G2H: 2>) -> List[int]
-     |
-     |  batch_get_key_info(...)
-     |      batch_get_key_info(self: _pymmc.DistributedObjectStore, keys: List[str]) -> List[_pymmc.KeyInfo]
-     |
-     |  batch_is_exist(...)
-     |      batch_is_exist(self: _pymmc.DistributedObjectStore, keys: List[str]) -> List[int]
-     |
-     |      Check if multiple objects exist. Returns list of results: 1 if exists, 0 if not exists, -1 if error
-     |
-     |  batch_put_from(...)
-     |      batch_put_from(self: _pymmc.DistributedObjectStore, keys: List[str], buffer_ptrs: List[int], sizes: List[int], direct: int = <BmCopyType.H2G: 3>, replicateConfig: _pymmc.ReplicateConfig = <_pymmc.ReplicateConfig object at 0xffffa0b46230>) -> List[int]
-     |
-     |      Put object data directly from pre-allocated buffers for multiple keys
-     |
-     |  batch_put_from_layers(...)
-     |      batch_put_from_layers(self: _pymmc.DistributedObjectStore, keys: List[str], buffer_ptrs: List[List[int]], sizes: List[List[int]], direct: int = <BmCopyType.H2G: 3>, replicateConfig: _pymmc.ReplicateConfig = <_pymmc.ReplicateConfig object at 0xffffa0b467f0>) ->
- List[int]
-     |
-     |  close(...)
-     |      close(self: _pymmc.DistributedObjectStore) -> int
-     |
-     |  get(...)
-     |      get(self: _pymmc.DistributedObjectStore, arg0: str) -> bytes
-     |
-     |  get_into(...)
-     |      get_into(self: _pymmc.DistributedObjectStore, key: str, buffer_ptr: int, size: int, direct: int = <BmCopyType.G2H: 2>) -> int
-     |
-     |      Get object data directly into a pre-allocated buffer
-     |
-     |  get_into_layers(...)
-     |      get_into_layers(self: _pymmc.DistributedObjectStore, key: str, buffer_ptrs: List[int], sizes: List[int], direct: int = <BmCopyType.G2H: 2>) -> int
-     |
-     |  get_key_info(...)
-     |      get_key_info(self: _pymmc.DistributedObjectStore, arg0: str) -> _pymmc.KeyInfo
-     |
-     |  get_local_service_id(...)
-     |      get_local_service_id(self: _pymmc.DistributedObjectStore) -> int
-     |
-     |      Get local serviceId
-     |
-     |  init(...)
-     |      init(self: _pymmc.DistributedObjectStore, device_id: int) -> int
-     |
-     |  is_exist(...)
-     |      is_exist(self: _pymmc.DistributedObjectStore, arg0: str) -> int
-     |
-     |  put(...)
-     |      put(self: _pymmc.DistributedObjectStore, key: str, buf: buffer, replicateConfig: _pymmc.ReplicateConfig = <_pymmc.ReplicateConfig object at 0xffffa0b285b0>) -> int
-     |
-     |  put_from(...)
-     |      put_from(self: _pymmc.DistributedObjectStore, key: str, buffer_ptr: int, size: int, direct: int = <BmCopyType.H2G: 3>, replicateConfig: _pymmc.ReplicateConfig = <_pymmc.ReplicateConfig object at 0xffffa0b45ef0>) -> int
-     |
-     |      Put object data directly from a pre-allocated buffer
-     |
-     |  put_from_layers(...)
-     |      put_from_layers(self: _pymmc.DistributedObjectStore, key: str, buffer_ptrs: List[int], sizes: List[int], direct: int = <BmCopyType.H2G: 3>, replicateConfig: _pymmc.ReplicateConfig = <_pymmc.ReplicateConfig object at 0xffffa0b464f0>) -> int
-     |
-     |  register_buffer(...)
-     |      register_buffer(self: _pymmc.DistributedObjectStore, buffer_ptr: int, size: int) -> int
-     |
-     |      Register a memory buffer for direct access operations
-     |
-     |  remove(...)
-     |      remove(self: _pymmc.DistributedObjectStore, arg0: str) -> int
-     |
-     |  remove_batch(...)
-     |      remove_batch(self: _pymmc.DistributedObjectStore, arg0: List[str]) -> List[int]
-     |
-     |  ----------------------------------------------------------------------
-     |  Static methods inherited from pybind11_builtins.pybind11_object:
-     |
-     |  __new__(*args, **kwargs) class method of pybind11_builtins.pybind11_object
-     |      Create and return a new object.  See help(type) for accurate signature.
+**示例**:
 
-    class KeyInfo(pybind11_builtins.pybind11_object)
-     |  Method resolution order:
-     |      KeyInfo
-     |      pybind11_builtins.pybind11_object
-     |      builtins.object
-     |
-     |  Methods defined here:
-     |
-     |  __init__(self, /, *args, **kwargs)
-     |      Initialize self.  See help(type(self)) for accurate signature.
-     |
-     |  __repr__(...)
-     |      __repr__(self: _pymmc.KeyInfo) -> str
-     |
-     |  __str__(...)
-     |      __str__(self: _pymmc.KeyInfo) -> str
-     |
-     |  loc_list(...)
-     |      loc_list(self: _pymmc.KeyInfo) -> List[int]
-     |
-     |  size(...)
-     |      size(self: _pymmc.KeyInfo) -> int
-     |
-     |  type_list(...)
-     |      type_list(self: _pymmc.KeyInfo) -> List[int]
-     |
-     |  ----------------------------------------------------------------------
-     |  Static methods inherited from pybind11_builtins.pybind11_object:
-     |
-     |  __new__(*args, **kwargs) class method of pybind11_builtins.pybind11_object
-     |      Create and return a new object.  See help(type) for accurate signature.
-
-    class MetaService(pybind11_builtins.pybind11_object)
-     |  Method resolution order:
-     |      MetaService
-     |      pybind11_builtins.pybind11_object
-     |      builtins.object
-     |
-     |  Methods defined here:
-     |
-     |  __init__(self, /, *args, **kwargs)
-     |      Initialize self.  See help(type(self)) for accurate signature.
-     |
-     |  ----------------------------------------------------------------------
-     |  Static methods defined here:
-     |
-     |  main(...) method of builtins.PyCapsule instance
-     |      main() -> int
-     |
-     |      Start the meta service process directly. This is a blocking call.
-     |
-     |  ----------------------------------------------------------------------
-     |  Static methods inherited from pybind11_builtins.pybind11_object:
-     |
-     |  __new__(*args, **kwargs) class method of pybind11_builtins.pybind11_object
-     |      Create and return a new object.  See help(type) for accurate signature.
-
-    class ReplicateConfig(pybind11_builtins.pybind11_object)
-     |  Configuration for replica allocation policy.
-     |
-     |  Method resolution order:
-     |      ReplicateConfig
-     |      pybind11_builtins.pybind11_object
-     |      builtins.object
-     |
-     |  Methods defined here:
-     |
-     |  __init__(...)
-     |      __init__(self: _pymmc.ReplicateConfig) -> None
-     |
-     |
-     |      Default constructor.
-     |      Initializes:
-     |        - preferredLocalServiceIDs = {}
-     |        - replicaNum = 0
-     |
-     |  ----------------------------------------------------------------------
-     |  Data descriptors defined here:
-     |
-     |  preferredLocalServiceIDs
-     |      List of instance IDs for forced storage. The values in the list must be unique,
-     |      and the list size must be equal to replicaNum.
-     |
-     |  replicaNum
-     |      Less than or equal to 8.
-     |
-     |  ----------------------------------------------------------------------
-     |  Static methods inherited from pybind11_builtins.pybind11_object:
-     |
-     |  __new__(*args, **kwargs) class method of pybind11_builtins.pybind11_object
-     |      Create and return a new object.  See help(type) for accurate signature.
-
-DATA
-    __all__ = ['DistributedObjectStore', 'ReplicateConfig', 'KeyInfo', 'Me...
-
-FILE
-    /usr/local/lib/python3.11/site-packages/memcache_hybrid/__init__.py
+```python
+# 创建配置对象
+config = LocalConfig()
+config.meta_service_url = "tcp://192.168.1.1:5000"
+config.protocol = "device_sdma"
+config.dram_size = "2GB"
+config.hbm_size = "8GB"
+config.client_timeout_seconds = 30
 ```
-
-## Python 接口列表
-
-说明：Python接口只封装了客户端，需要配置metaservice独立进程使用
 
 ### DistributedObjectStore 类
 
 DistributedObjectStore是分布式对象存储的Python接口封装类，提供了完整的分布式内存缓存操作接口。
 
-#### \_\_init\_\_
+#### __init__
 
 ```python
 store = DistributedObjectStore()
@@ -244,10 +167,27 @@ store = DistributedObjectStore()
 
 **功能**: 创建DistributedObjectStore实例
 
+#### setup
+
+```python
+result = store.setup(config)
+```
+
+**功能**: 设置分布式内存缓存客户端配置
+
+**参数**:
+
+- `config`: LocalConfig对象，包含客户端的所有配置参数
+
+**返回值**:
+
+- `0`: 成功
+- 其他: 失败
+
 #### init
 
 ```python
-result = store.init(device_id, init_bm=true)
+result = store.init(device_id, init_bm=True)
 ```
 
 **功能**: 初始化分布式内存缓存客户端
@@ -255,7 +195,7 @@ result = store.init(device_id, init_bm=true)
 **参数**:
 
 - `device_id`: 使用HBM时的NPU卡用户ID（支持ASCEND_RT_VISIBLE_DEVICES映射）
-- `init_bm`: 是否初始化BM提供内存，默认值为 true。设 false 时将启动纯client模式，不支持数据读写操作
+- `init_bm`: 是否初始化BM提供内存，默认值为 True。设 False 时将启动纯client模式，不支持数据读写操作
 
 **返回值**:
 
@@ -268,7 +208,7 @@ result = store.init(device_id, init_bm=true)
 store.get_local_service_id()
 ```
 
-**功能**: Get local serviceId
+**功能**: 获取本地服务ID
 
 #### close
 
@@ -290,7 +230,7 @@ result = store.put(key, data, replicateConfig=defaultConfig)
 
 - `key`: 数据的键，字符串类型
 - `data`: 要存储的字节数据
-- `replicateConfig`: 具体看ReplicateConfig数据结构
+- `replicateConfig`: 复制配置，具体请参考ReplicateConfig数据结构
 
 **返回值**:
 
@@ -303,14 +243,13 @@ result = store.put(key, data, replicateConfig=defaultConfig)
 def put_batch(self, keys: List[str], values: List[bytes], replicateConfig: ReplicateConfig = None) -> int
 ```
 
-**功能**: 在单个批处理操作中存储多个对象。
+**功能**: 在单个批处理操作中存储多个对象，提高处理效率
 
 **参数**:
 
 - `keys` (List[str]): 对象标识符列表
 - `values` (List[bytes]): 要存储的二进制数据列表
 - `replicateConfig` (ReplicateConfig, optional): 所有对象的复制配置
-
 
 **返回值**:
 
@@ -336,7 +275,7 @@ assert result == 0, f"put_batch failed: {result}"
 result = store.put_from(key, buffer_ptr, size, direct=SMEMB_COPY_H2G, replicateConfig=defaultConfig)
 ```
 
-**功能**: 从预分配的缓冲区中写入数据
+**功能**: 从预分配的缓冲区中写入数据，适用于需要高效内存管理的场景
 
 **参数**:
 
@@ -346,7 +285,7 @@ result = store.put_from(key, buffer_ptr, size, direct=SMEMB_COPY_H2G, replicateC
 - `direct`: 数据拷贝方向，可选值：
     - `SMEMB_COPY_H2G`: 从主机内存到全局内存（默认）
     - `SMEMB_COPY_L2G`: 从卡上内存到全局内存
-- `replicateConfig`: 具体看ReplicateConfig数据结构
+- `replicateConfig`: 复制配置，具体请参考ReplicateConfig数据结构
 
 **返回值**:
 
@@ -359,7 +298,7 @@ result = store.put_from(key, buffer_ptr, size, direct=SMEMB_COPY_H2G, replicateC
 result = store.batch_put_from(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, replicateConfig=defaultConfig)
 ```
 
-**功能**: 从预分配的缓冲区中批量写入数据
+**功能**: 从预分配的缓冲区中批量写入数据，提高处理效率
 
 **参数**:
 
@@ -369,7 +308,7 @@ result = store.batch_put_from(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, r
 - `direct`: 数据拷贝方向，可选值：
     - `SMEMB_COPY_H2G`: 从主机内存到全局内存（默认）
     - `SMEMB_COPY_L2G`: 从卡上内存到全局内存
-- `replicateConfig`: 具体看ReplicateConfig数据结构
+- `replicateConfig`: 复制配置，具体请参考ReplicateConfig数据结构
 
 **返回值**:
 
@@ -383,7 +322,7 @@ result = store.batch_put_from(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, r
 result = store.put_from_layers(key, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, replicateConfig=defaultConfig)
 ```
 
-**功能**: 从多个预分配的缓冲区中写入数据（分层数据）
+**功能**: 从多个预分配的缓冲区中写入分层数据，适用于复杂数据结构的存储
 
 **参数**:
 
@@ -393,7 +332,7 @@ result = store.put_from_layers(key, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, r
 - `direct`: 数据拷贝方向，可选值：
     - `SMEMB_COPY_H2G`: 从主机内存到全局内存（默认）
     - `SMEMB_COPY_L2G`: 从卡上内存到全局内存
-- `replicateConfig`: 具体看ReplicateConfig数据结构
+- `replicateConfig`: 复制配置，具体请参考ReplicateConfig数据结构
 
 **返回值**:
 
@@ -407,7 +346,7 @@ result = store.batch_put_from_layers(keys, buffer_ptrs_list, sizes_list, direct=
                                      replicateConfig=defaultConfig)
 ```
 
-**功能**: 从多个预分配的缓冲区中批量写入分层数据
+**功能**: 从多个预分配的缓冲区中批量写入分层数据，提高处理效率
 
 **参数**:
 
@@ -417,7 +356,7 @@ result = store.batch_put_from_layers(keys, buffer_ptrs_list, sizes_list, direct=
 - `direct`: 数据拷贝方向，可选值：
     - `SMEMB_COPY_H2G`: 从主机内存到全局内存（默认）
     - `SMEMB_COPY_L2G`: 从卡上内存到全局内存
-- `replicateConfig`: 具体看ReplicateConfig数据结构
+- `replicateConfig`: 复制配置，具体请参考ReplicateConfig数据结构
 
 **返回值**:
 
@@ -448,7 +387,7 @@ data = store.get(key)
 def get_batch(self, keys: List[str]) -> List[bytes]
 ```
 
-**功能**: 在单个batch操作中检索多个对象。
+**功能**: 在单个批处理操作中检索多个对象，提高处理效率
 
 **参数**:
 
@@ -479,7 +418,7 @@ for key, value in zip(keys, values):
 result = store.get_into(key, buffer_ptr, size, direct=SMEMB_COPY_G2H)
 ```
 
-**功能**: 将数据直接获取到预分配的缓冲区中
+**功能**: 将数据直接获取到预分配的缓冲区中，适用于需要高效内存管理的场景
 
 **参数**:
 
@@ -501,7 +440,7 @@ result = store.get_into(key, buffer_ptr, size, direct=SMEMB_COPY_G2H)
 results = store.batch_get_into(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_G2H)
 ```
 
-**功能**: 批量将数据获取到预分配的缓冲区中
+**功能**: 批量将数据获取到预分配的缓冲区中，提高处理效率
 
 **参数**:
 
@@ -524,7 +463,7 @@ results = store.batch_get_into(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_G2H)
 result = store.get_into_layers(key, buffer_ptrs, sizes, direct=SMEMB_COPY_G2H)
 ```
 
-**功能**: 将数据分层获取到预分配的缓冲区中
+**功能**: 将数据分层获取到预分配的缓冲区中，适用于复杂数据结构的读取
 
 **参数**:
 
@@ -546,7 +485,7 @@ result = store.get_into_layers(key, buffer_ptrs, sizes, direct=SMEMB_COPY_G2H)
 results = store.batch_get_into_layers(keys, buffer_ptrs_list, sizes_list, direct=SMEMB_COPY_G2H)
 ```
 
-**功能**: 批量将分层数据获取到预分配的缓冲区中
+**功能**: 批量将分层数据获取到预分配的缓冲区中，提高处理效率
 
 **参数**:
 
@@ -586,7 +525,7 @@ result = store.remove(key)
 results = store.remove_batch(keys)
 ```
 
-**功能**: 批量删除数据
+**功能**: 批量删除数据，提高处理效率
 
 **参数**:
 
@@ -604,7 +543,7 @@ results = store.remove_batch(keys)
 result = store.remove_all()
 ```
 
-**功能**: 删除内存池中所有的key
+**功能**: 删除内存池中所有的键值对
 
 **返回值**:
 
@@ -635,7 +574,7 @@ result = store.is_exist(key)
 results = store.batch_is_exist(keys)
 ```
 
-**功能**: 批量检查键是否存在
+**功能**: 批量检查键是否存在，提高处理效率
 
 **参数**:
 
@@ -674,7 +613,7 @@ key_info = store.get_key_info(key)
 key_infos = store.batch_get_key_info(keys)
 ```
 
-**功能**: 批量获取多个key的数据信息
+**功能**: 批量获取多个key的数据信息，提高处理效率
 
 **参数**:
 
@@ -724,21 +663,136 @@ result = store.unregister_buffer(buffer_ptr, size)
 - `0`: 成功
 - 其他: 失败
 
-### 使用示例
+## 使用示例
+
+### 基本使用示例
+
+以下示例展示了如何使用LocalConfig配置并使用DistributedObjectStore：
 
 ```python
+from memcache_hybrid import LocalConfig, DistributedObjectStore, ReplicateConfig
+
+# 创建配置对象
+config = LocalConfig()
+config.meta_service_url = "tcp://192.168.1.1:5000"
+config.config_store_url = "tcp://192.168.1.1:6000"
+config.protocol = "device_sdma"
+config.dram_size = "10GB"
+config.hbm_size = "5GB"
+config.client_timeout_seconds = 30
+
+# 初始化存储客户端
 store = DistributedObjectStore()
-store.init(device_id=0)
+result = store.setup(config)  # 设置配置
+if result != 0:
+    raise Exception(f"Failed to setup store: {result}")
+
+result = store.init(device_id=0, init_bm=True)
+if result != 0:
+    raise Exception(f"Failed to init store: {result}")
+
+# 执行数据操作
+# 创建复制配置
 replica_cfg = ReplicateConfig()
 replica_cfg.replicaNum = 3
 replica_cfg.preferredLocalServiceIDs = [101, 102, 103]
+
+# 存储数据
 buffer = bytearray(b"example_data")
-store.put("key1", buffer, replica_cfg)
+result = store.put("key1", buffer, replica_cfg)
+if result != 0:
+    raise Exception(f"Failed to put data: {result}")
+
+# 检索数据
 data = store.get("key1")
+print(f"Retrieved data: {data}")
+
+# 检查数据是否存在
+exists = store.is_exist("key1")
+print(f"Data exists: {exists}")
+
+# 删除数据
+result = store.remove("key1")
+if result != 0:
+    raise Exception(f"Failed to remove data: {result}")
+
+# 关闭连接
 store.close()
 ```
 
-## 文档中涉及到的结构体含义
+### 使用环境变量进行配置
+
+以下示例展示了如何使用环境变量配置客户端（兼容原有方式）：
+
+```python
+import os
+from memcache_hybrid import DistributedObjectStore
+
+# 设置环境变量
+os.environ["MMC_LOCAL_CONFIG_PATH"] = "/path/to/local_config.conf"
+
+# 创建并初始化客户端
+store = DistributedObjectStore()
+result = store.init(device_id=0)
+if result != 0:
+    raise Exception(f"Failed to init store: {result}")
+
+# 执行数据操作
+buffer = bytearray(b"example_data")
+result = store.put("key1", buffer)
+if result != 0:
+    raise Exception(f"Failed to put data: {result}")
+
+# 检索数据
+data = store.get("key1")
+print(f"Retrieved data: {data}")
+
+# 关闭连接
+store.close()
+```
+
+### 批量操作示例
+
+以下示例展示了如何使用批量操作提高处理效率：
+
+```python
+from memcache_hybrid import LocalConfig, DistributedObjectStore
+
+# 创建配置和客户端
+config = LocalConfig()
+config.meta_service_url = "tcp://192.168.1.1:5000"
+config.meta_se·rvice_url = "tcp://192.168.1.1:5000"
+config.protocol = "device_sdma"
+
+store = DistributedObjectStore()
+store.setup(config)
+store.init(device_id=0, init_bm=True)
+
+# 批量存储数据
+keys = ["key1", "key2", "key3", "key4", "key5"]
+values = [b"value1", b"value2", b"value3", b"value4", b"value5"]
+result = store.put_batch(keys, values)
+if result != 0:
+    raise Exception(f"Failed to put batch: {result}")
+
+# 批量检索数据
+retrieved_values = store.get_batch(keys)
+for key, value in zip(keys, retrieved_values):
+    print(f"{key}: {value}")
+
+# 批量检查数据是否存在
+existence = store.batch_is_exist(keys)
+print(f"Existence: {existence}")
+
+# 批量删除数据
+results = store.remove_batch(keys)
+print(f"Remove results: {results}")
+
+# 关闭连接
+store.close()
+```
+
+## 数据结构与枚举类型
 
 ### BmCopyType 枚举类型
 
@@ -748,49 +802,55 @@ store.close()
 - `L2G`: 从卡上内存到全局内存
 - `G2H`: 从全局内存到主机内存
 - `G2L`: 从全局内存到卡上内存
+- `AUTO`: 根据内存类型自动选择拷贝方向
 
-## 数据结构
+### LocalConfig 配置类
 
-### ReplicateConfig
+客户端配置结构体，用于设置分布式内存缓存客户端的各种参数。详情请参考[LocalConfig 类](#localconfig-类)的参数说明。
 
-客户端配置结构体，包含以下字段：
+### ReplicateConfig 配置类
+
+客户端复制配置结构体，用于设置数据复制策略：
 
 - `replicaNum`: 副本数，最大为8，默认为1
-- `preferredLocalServiceIDs`: 强制分配的实例id列表，列表大小必须小于或等于replicaNum
+- `preferredLocalServiceIDs`: 强制分配的实例ID列表，列表大小必须小于或等于replicaNum
 
 ## 错误码
 
-| 值     | 说明        |
-|-------|-----------|
-| 0     | 操作成功      |
-| -1    | 一般错误      |
-| -3000 | 参数无效      |
-| -3001 | 内存分配失败    |
-| -3002 | 对象创建失败    |
-| -3003 | 服务未启动     |
-| -3004 | 操作超时      |
-| -3005 | 重复调用      |
-| -3006 | 对象已存在     |
-| -3007 | 对象不存在     |
-| -3008 | 未初始化      |
-| -3009 | 网络序列号重复   |
-| -3010 | 网络序列号未找到  |
-| -3011 | 已通知       |
-| -3013 | 超出容量限制    |
-| -3014 | 连接未找到     |
-| -3015 | 网络请求句柄未找到 |
-| -3016 | 内存不足      |
-| -3017 | 未连接到元数据服务 |
-| -3018 | 未连接到本地服务  |
-| -3019 | 客户端未初始化   |
-| -3101 | 状态不匹配     |
-| -3102 | 键不匹配      |
-| -3103 | 返回值不匹配    |
-| -3104 | 租约未到期     |
-| -3105 | 元数据备份失败 |
+| 错误码 | 说明                |
+|-------|---------------------|
+| 0     | 操作成功            |
+| -1    | 一般错误            |
+| -3000 | 参数无效            |
+| -3001 | 内存分配失败        |
+| -3002 | 对象创建失败        |
+| -3003 | 服务未启动          |
+| -3004 | 操作超时            |
+| -3005 | 重复调用            |
+| -3006 | 对象已存在          |
+| -3007 | 对象不存在          |
+| -3008 | 未初始化            |
+| -3009 | 网络序列号重复      |
+| -3010 | 网络序列号未找到    |
+| -3011 | 已通知              |
+| -3013 | 超出容量限制        |
+| -3014 | 连接未找到          |
+| -3015 | 网络请求句柄未找到  |
+| -3016 | 内存不足            |
+| -3017 | 未连接到元数据服务  |
+| -3018 | 未连接到本地服务    |
+| -3019 | 客户端未初始化      |
+| -3101 | 状态不匹配          |
+| -3102 | 键不匹配            |
+| -3103 | 返回值不匹配        |
+| -3104 | 租约未到期          |
+| -3105 | 元数据备份失败      |
 
 ## 注意事项
 
 - 所有键的长度必须小于256字节
 - 支持同步和异步两种操作模式
-- 批量操作可以提高处理效率
+- 批量操作可以显著提高处理效率，建议在大量数据操作时使用
+- TLS配置需要确保证书路径和权限正确
+- 客户端需要与meta service保持网络连通性
+- 初始化时设置init_bm为False将启动纯client模式，不支持数据读写操作
