@@ -10,18 +10,23 @@
 # MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 # See the Mulan PSL v2 for more details.
 
-import time
-import sys
-import unittest
 import multiprocessing
-from memcache_hybrid import DistributedObjectStore
-from memcache_hybrid import MetaService
+import sys
+import time
+import unittest
+
 import acl
+from memcache_hybrid import DistributedObjectStore, LocalConfig, MetaConfig, MetaService
 
 
 # 启动 MetaService 在后台线程中运行
 def start_meta_service():
+    config = MetaConfig()
+    config.meta_service_url = "tcp://127.0.0.1:5000"
+    config.config_store_url = "tcp://127.0.0.1:6000"
+    config.metrics_url = "http://127.0.0.1:8000"
     try:
+        assert MetaService.setup(config) == 0, "setup meta config failed"
         MetaService.main()
     except Exception as e:
         print(f"MetaService 出错: {e}")
@@ -45,7 +50,16 @@ class TestExample(unittest.TestCase):
         print("设备数量:", acl.rt.get_device_count())
         ret = acl.rt.set_device(count - 1)
         print("set_device returned: {}".format(ret))
+
+        config = LocalConfig()
+        config.protocol = "device_rdma"
+        config.dram_size = "10GB"
+        config.max_dram_size = "64GB"
+        print(config)
+
         self._distributed_object_store = DistributedObjectStore()
+        res = self._distributed_object_store.setup(config)
+        self.assertEqual(res, 0)
         res = self._distributed_object_store.init(count - 1)
         self.assertEqual(res, 0)
 
@@ -94,5 +108,5 @@ class TestExample(unittest.TestCase):
                 proc.join()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

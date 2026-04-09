@@ -180,6 +180,19 @@ void mmc_uninit(void);
 #ifdef __cplusplus
 
 /**
+ * @brief Create a mmc_meta_service_config_t object with built-in default values.
+ * @return mmc_meta_service_config_t default-initialized meta service configuration
+ */
+mmc_meta_service_config_t create_default_meta_config();
+
+/**
+ * @brief Convert meta service configuration to a readable string.
+ * @param config           [in] meta service configuration object
+ * @return std::string     formatted configuration string
+ */
+std::string meta_config_to_string(const mmc_meta_service_config_t &config);
+
+/**
  * @brief Create a local_config object with built-in default values.
  * @return local_config    default-initialized local configuration
  */

@@ -29,6 +29,60 @@ static bool mmcInit = false;
 static ClientConfig g_clientConfig{};
 static mmc_local_service_config_t g_localServiceConfig{};
 
+mmc_meta_service_config_t create_default_meta_config()
+{
+    mmc_meta_service_config_t config{};
+    SafeCopy("tcp://127.0.0.1:5000", config.discoveryURL, sizeof(config.discoveryURL));
+    SafeCopy("tcp://127.0.0.1:6000", config.configStoreURL, sizeof(config.configStoreURL));
+    SafeCopy("http://127.0.0.1:8000", config.httpURL, sizeof(config.httpURL));
+    config.haEnable = false;
+    config.logLevel = INFO_LEVEL;
+    SafeCopy("/var/log/memcache_hybrid", config.logPath, sizeof(config.logPath));
+    config.logRotationFileSize = 20 * MB_NUM;
+    config.logRotationFileCount = 50;
+    config.evictThresholdHigh = 90U;
+    config.evictThresholdLow = 80U;
+    config.accTlsConfig.tlsEnable = false;
+    config.configStoreTlsConfig.tlsEnable = false;
+    config.ubsIoEnable = false;
+    return config;
+}
+
+std::string meta_config_to_string(const mmc_meta_service_config_t &config)
+{
+    std::ostringstream oss;
+    oss << "MetaConfig {\n";
+    oss << "  meta_service_url: " << config.discoveryURL << "\n";
+    oss << "  config_store_url: " << config.configStoreURL << "\n";
+    oss << "  metrics_url: " << config.httpURL << "\n";
+    oss << "  ha_enable: " << (config.haEnable ? "true" : "false") << "\n";
+    oss << "  log_level: " << config.logLevel << "\n";
+    oss << "  log_path: " << config.logPath << "\n";
+    oss << "  log_rotation_file_size: " << config.logRotationFileSize << "\n";
+    oss << "  log_rotation_file_count: " << config.logRotationFileCount << "\n";
+    oss << "  evict_threshold_high: " << config.evictThresholdHigh << "\n";
+    oss << "  evict_threshold_low: " << config.evictThresholdLow << "\n";
+    oss << "  ubs_io_enable: " << (config.ubsIoEnable ? "true" : "false") << "\n";
+    oss << "  tls_enable: " << (config.accTlsConfig.tlsEnable ? "true" : "false") << "\n";
+    oss << "  tls_ca_path: " << config.accTlsConfig.caPath << "\n";
+    oss << "  tls_ca_crl_path: " << config.accTlsConfig.crlPath << "\n";
+    oss << "  tls_cert_path: " << config.accTlsConfig.certPath << "\n";
+    oss << "  tls_key_path: " << config.accTlsConfig.keyPath << "\n";
+    oss << "  tls_key_pass_path: " << config.accTlsConfig.keyPassPath << "\n";
+    oss << "  tls_package_path: " << config.accTlsConfig.packagePath << "\n";
+    oss << "  tls_decrypter_path: " << config.accTlsConfig.decrypterLibPath << "\n";
+    oss << "  config_store_tls_enable: " << (config.configStoreTlsConfig.tlsEnable ? "true" : "false") << "\n";
+    oss << "  config_store_tls_ca_path: " << config.configStoreTlsConfig.caPath << "\n";
+    oss << "  config_store_tls_ca_crl_path: " << config.configStoreTlsConfig.crlPath << "\n";
+    oss << "  config_store_tls_cert_path: " << config.configStoreTlsConfig.certPath << "\n";
+    oss << "  config_store_tls_key_path: " << config.configStoreTlsConfig.keyPath << "\n";
+    oss << "  config_store_tls_key_pass_path: " << config.configStoreTlsConfig.keyPassPath << "\n";
+    oss << "  config_store_tls_package_path: " << config.configStoreTlsConfig.packagePath << "\n";
+    oss << "  config_store_tls_decrypter_path: " << config.configStoreTlsConfig.decrypterLibPath << "\n";
+    oss << "}";
+    return oss.str();
+}
+
 local_config create_default_local_config()
 {
     local_config cfg{};

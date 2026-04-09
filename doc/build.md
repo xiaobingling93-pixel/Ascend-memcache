@@ -100,11 +100,24 @@ pip show memcache_hybrid
 1、安装whl包（如在安装run包过程中，已安装whl包，此步骤可省略）
 pip install memcache_hybrid-1.0.0-cp311-cp311-linux_aarch64.whl # 修改为实际的安装包名
 
-2、设置配置文件环境变量
+2、方式一：环境变量 + 配置文件（兼容原有方式）
 export MMC_META_CONFIG_PATH=/usr/local/memcache_hybrid/latest/config/mmc-meta.conf
 
-3、进入python控制台或者编写python脚本如下即可拉起进程：
+进入python控制台或者编写python脚本如下即可拉起进程：
 from memcache_hybrid import MetaService
+MetaService.main()
+
+3、方式二（推荐）：Python 直接设置配置（无需 MMC_META_CONFIG_PATH）
+from memcache_hybrid import MetaService, MetaConfig
+
+config = MetaConfig()
+config.meta_service_url = "tcp://192.168.1.1:5000"
+config.config_store_url = "tcp://192.168.1.2:6000"
+config.metrics_url = "http://192.168.1.1:8000"
+config.ha_enable = False
+config.log_level = "info"
+
+MetaService.setup(config)
 MetaService.main()
 ```
 * **bin形式**：
@@ -113,9 +126,9 @@ MetaService.main()
 1、设置环境变量
 source /usr/local/memcache_hybrid/set_env.sh
 source /usr/local/memfabric_hybrid/set_env.sh
-export MMC_META_CONFIG_PATH=/usr/local/memcache_hybrid/latest/config/mmc-meta.conf
 
-2、拉起二进制
+2、环境变量 + 配置文件
+export MMC_META_CONFIG_PATH=/usr/local/memcache_hybrid/latest/config/mmc-meta.conf
 /usr/local/memcache_hybrid/latest/aarch64-linux/bin/mmc_meta_service
 ```
 
@@ -126,11 +139,25 @@ export MMC_META_CONFIG_PATH=/usr/local/memcache_hybrid/latest/config/mmc-meta.co
 1、安装whl包（如在安装run包过程中，已安装whl包，此步骤可省略）
 pip install memcache_hybrid-1.0.0-cp311-cp311-linux_aarch64.whl # 修改为实际的安装包名
 
-2、设置配置文件环境变量
+2、方式一：环境变量 + 配置文件（兼容原有方式）
 export MMC_LOCAL_CONFIG_PATH=/usr/local/memcache_hybrid/latest/config/mmc-local.conf
 
-3、通过MemCache提供的接口初始化客户端并拉起localservice，执行数据写入、查询、获取、删除等，下面的脚本是一个示例：
+通过MemCache提供的接口初始化客户端并拉起localservice，执行数据写入、查询、获取、删除等，下面的脚本是一个示例：
 python3 test_mmc_demo.py
+
+3、方式二（推荐）：Python 入口直接指定 local 配置文件路径
+from memcache_hybrid import DistributedObjectStore, LocalConfig
+
+config = LocalConfig()
+config.protocol = "device_rdma"
+config.dram_size = "10GB"
+config.max_dram_size = "64GB"
+print(config)
+
+store = DistributedObjectStore()
+assert store.setup(config) == 0, "setup local config failed"
+ret = store.setup("/usr/local/memcache_hybrid/latest/config/mmc-local.conf", device_id=0, init_bm=True)
+print(ret)
 ```
 
 * **so（C++）**：

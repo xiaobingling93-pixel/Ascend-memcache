@@ -12,11 +12,11 @@
 
 __all__ = [
     "DistributedObjectStore",
-    "ReplicateConfig",
     "KeyInfo",
-    "MetaService",
-    "CopyType",
     "LocalConfig",
+    "MetaConfig",
+    "MetaService",
+    "ReplicateConfig",
 ]
 
 import ctypes
@@ -37,9 +37,7 @@ from _pymmc import (
     DistributedObjectStore,
     KeyInfo,
     LocalConfig,
+    MetaConfig,
     MetaService,
     ReplicateConfig,
 )
-from memfabric_hybrid import bm
-
-CopyType = bm.BmCopyType

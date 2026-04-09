@@ -63,9 +63,11 @@ int MmcMetaServiceProcess::MainForPython()
         return -1;
     }
 
-    if (LoadConfig() != 0) {
-        std::cerr << "Error, failed to load config." << std::endl;
-        return -1;
+    if (!isSetupConfig_) {
+        if (LoadConfig() != 0) {
+            std::cerr << "Error, failed to load config." << std::endl;
+            return -1;
+        }
     }
 
     RegisterSignal();
@@ -118,6 +120,21 @@ int MmcMetaServiceProcess::MainForPython()
     return 0;
 }
 
+int MmcMetaServiceProcess::Setup(const mmc_meta_service_config_t &config)
+{
+    const auto oldConfig = config_;
+    const auto oldIsSetupConfig = isSetupConfig_;
+    config_ = config;
+    isSetupConfig_ = true;
+    if (ValidateConfig() != 0) {
+        // recover old config
+        config_ = oldConfig;
+        isSetupConfig_ = oldIsSetupConfig;
+        return -1;
+    }
+    return 0;
+}
+
 bool MmcMetaServiceProcess::CheckIsRunning()
 {
     const std::string filePath = "/tmp/mmc_meta_service";
@@ -166,6 +183,20 @@ int MmcMetaServiceProcess::LoadConfig()
         }
     }
     configManager.GetMetaServiceConfig(config_);
+
+    if (ValidateConfig() != 0) {
+        std::cerr << "Error, invalid config." << std::endl;
+        return -1;
+    }
+    return 0;
+}
+
+int MmcMetaServiceProcess::ValidateConfig() const
+{
+    if (config_.logLevel < DEBUG_LEVEL || config_.logLevel >= BUTT_LEVEL) {
+        std::cerr << "Invalid log level." << std::endl;
+        return -1;
+    }
     if (MetaServiceConfig::ValidateTLSConfig(config_.accTlsConfig) != MMC_OK) {
         std::cerr << "Invalid tls config." << std::endl;
         return -1;
@@ -184,7 +215,7 @@ int MmcMetaServiceProcess::LoadConfig()
 
 void MmcMetaServiceProcess::RegisterSignal()
 {
-    struct sigaction action {};
+    struct sigaction action{};
     action.sa_handler = SignalInterruptHandler;
     sigemptyset(&action.sa_mask);
 

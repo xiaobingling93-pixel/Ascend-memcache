@@ -35,6 +35,22 @@ python3
 
 ```
 
+也可以直接在 Python 中配置启动参数（无需 MMC_META_CONFIG_PATH）：
+
+```python
+from memcache_hybrid import MetaConfig, MetaService
+
+config = MetaConfig()
+config.meta_service_url = "tcp://192.168.1.1:5000"
+config.config_store_url = "tcp://192.168.1.2:6000"
+config.metrics_url = "http://192.168.1.1:8000"
+config.ha_enable = False
+config.log_level = "info"
+
+MetaService.setup(config)
+MetaService.main()
+```
+
 ## 配置大页
 注：仅device rdma/host rdma等protocol需要设置
 ```shell
@@ -44,11 +60,8 @@ python3
 
 ## 执行脚本
 
-选择脚本，直接执行，以test_mmc_start_meta_service_and_simple_test.py为例，会在一个进程里面启动meta服务和localService并且完成put，get等测试（不需要前面步骤单独的启动meta服务进程）
+选择脚本，直接执行，以test_mmc_start_meta_service_and_simple_test.py为例，会在一个进程里面启动meta服务和localService并且完成put，get等测试（不需要前面步骤单独的启动meta服务进程），如需修改参数，请调整MetaConfig、LocalConfig相关代码。
 
 ```shell
-export MMC_LOCAL_CONFIG_PATH=/usr/local/memcache_hybrid/latest/config/mmc-local.conf;
-export MMC_META_CONFIG_PATH=/usr/local/memcache_hybrid/latest/config/mmc-meta.conf;
-
 python python/test_mmc_start_meta_service_and_simple_test.py
 ```

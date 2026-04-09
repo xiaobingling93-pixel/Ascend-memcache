@@ -38,12 +38,14 @@ public:
     MmcMetaServiceProcess(const MmcMetaServiceProcess &) = delete;
     MmcMetaServiceProcess &operator=(const MmcMetaServiceProcess &) = delete;
 
+    int Setup(const mmc_meta_service_config_t &config);
     int MainForExecutable();
     int MainForPython();
 
 private:
     static bool CheckIsRunning();
     int LoadConfig();
+    int ValidateConfig() const;
     static int ExtractIpPortFromUrl(const std::string &url, std::string &ip, uint16_t &port);
     static void RegisterSignal();
     static void SignalInterruptHandler(const int signal);
@@ -52,6 +54,7 @@ private:
     void Exit();
 
     mmc_meta_service_config_t config_{};
+    bool isSetupConfig_{false};
     MmcMetaService *metaService_{};
     MmcMetaServiceLeaderElection *leaderElection_{};
     MmcHttpServer *httpServer_{};

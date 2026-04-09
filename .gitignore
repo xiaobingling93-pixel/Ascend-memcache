@@ -3,6 +3,7 @@
 /.idea/
 /.trae/
 /.codemate/
+/.cache/
 /output/
 /build/
 /script/git_last_commit.txt

@@ -10,14 +10,13 @@
  * See the Mulan PSL v2 for more details.
 */
 
-#include <algorithm>
-
-#include "mmc_client.h"
 #include "mmc.h"
+#include "mmc_def.h"
 #include "mmc_ptracer.h"
 #include "mmc_meta_service_process.h"
 #include "common/mmc_functions.h"
 #include "smem_bm_def.h"
+#include "mmc_helper.h"
 #include "pymmc.h"
 
 namespace py = pybind11;
@@ -352,6 +351,256 @@ void DefineMmcStructModule(py::module_ &m)
         .def("__repr__", &local_config_to_string, R"pbdoc(
              Returns a string representation of all member variables.
          )pbdoc");
+
+    auto metaConfigClass =
+        py::class_<mmc_meta_service_config_t>(m, "MetaConfig", R"pbdoc(
+            Meta service configuration.
+        )pbdoc")
+            .def(py::init([]() { return create_default_meta_config(); }),
+                 R"pbdoc(
+                    Default constructor. Initializes with default values.
+                )pbdoc")
+            .def_property(
+                "meta_service_url",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.discoveryURL); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.discoveryURL, DISCOVERY_URL_SIZE);
+                },
+                R"pbdoc(
+                    Meta service start-up url.
+                )pbdoc")
+            .def_property(
+                "config_store_url",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.configStoreURL); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.configStoreURL, DISCOVERY_URL_SIZE);
+                },
+                R"pbdoc(
+                    Config store url.
+                )pbdoc")
+            .def_property(
+                "metrics_url", [](const mmc_meta_service_config_t &config) { return std::string(config.httpURL); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.httpURL, DISCOVERY_URL_SIZE);
+                },
+                R"pbdoc(
+                    The metrics HTTP service url.
+                )pbdoc")
+            .def_property(
+                "ha_enable", [](const mmc_meta_service_config_t &config) { return config.haEnable; },
+                [](mmc_meta_service_config_t &config, bool value) { config.haEnable = value; },
+                R"pbdoc(
+             Enable or disable high availability deployment.
+                )pbdoc")
+            .def_property(
+                "log_level",
+                [](const mmc_meta_service_config_t &config) { return MetaLogLevelToString(config.logLevel); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    config.logLevel = MetaLogLevelFromString(value);
+                },
+                R"pbdoc(
+                    Log level: debug, info, warn, error.
+                )pbdoc")
+            .def_property(
+                "log_path", [](const mmc_meta_service_config_t &config) { return std::string(config.logPath); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.logPath, PATH_MAX_SIZE);
+                },
+                R"pbdoc(
+                    Log directory path.
+                )pbdoc")
+            .def_property(
+                "log_rotation_file_size",
+                [](const mmc_meta_service_config_t &config) { return config.logRotationFileSize / (1024 * 1024); },
+                [](mmc_meta_service_config_t &config, int32_t value) {
+                    config.logRotationFileSize = value * (1024 * 1024);
+                },
+                R"pbdoc(
+                    Log rotation file size in MB.
+                )pbdoc")
+            .def_readwrite("log_rotation_file_count", &mmc_meta_service_config_t::logRotationFileCount,
+                           R"pbdoc(
+                    Log rotation file count.
+                )pbdoc")
+            .def_readwrite("evict_threshold_high", &mmc_meta_service_config_t::evictThresholdHigh,
+                           R"pbdoc(
+                Eviction high threshold in percentage.
+                )pbdoc")
+            .def_readwrite("evict_threshold_low", &mmc_meta_service_config_t::evictThresholdLow,
+                           R"pbdoc(
+                    Eviction low threshold in percentage.
+                )pbdoc")
+            .def_readwrite("ubs_io_enable", &mmc_meta_service_config_t::ubsIoEnable,
+                           R"pbdoc(
+                    Enable UBS_IO.
+                )pbdoc")
+            .def_property(
+                "tls_enable", [](const mmc_meta_service_config_t &config) { return config.accTlsConfig.tlsEnable; },
+                [](mmc_meta_service_config_t &config, bool value) { config.accTlsConfig.tlsEnable = value; },
+                R"pbdoc(
+                    Enable TLS for metaservice.
+                )pbdoc")
+            .def_property(
+                "tls_ca_path",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.accTlsConfig.caPath); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.accTlsConfig.caPath, sizeof(config.accTlsConfig.caPath));
+                },
+                R"pbdoc(
+                    TLS CA certificate path.
+                )pbdoc")
+            .def_property(
+                "tls_ca_crl_path",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.accTlsConfig.crlPath); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.accTlsConfig.crlPath, sizeof(config.accTlsConfig.crlPath));
+                },
+                R"pbdoc(
+                    TLS CA CRL path.
+                )pbdoc")
+            .def_property(
+                "tls_cert_path",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.accTlsConfig.certPath); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.accTlsConfig.certPath, sizeof(config.accTlsConfig.certPath));
+                },
+                R"pbdoc(
+             TLS certificate path.
+                )pbdoc")
+            .def_property(
+                "tls_key_path",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.accTlsConfig.keyPath); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.accTlsConfig.keyPath, sizeof(config.accTlsConfig.keyPath));
+                },
+                R"pbdoc(
+                    TLS key path.
+                )pbdoc")
+            .def_property(
+                "tls_key_pass_path",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.accTlsConfig.keyPassPath); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.accTlsConfig.keyPassPath, sizeof(config.accTlsConfig.keyPassPath));
+                },
+                R"pbdoc(
+             TLS key passphrase path.
+                )pbdoc")
+            .def_property(
+                "tls_package_path",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.accTlsConfig.packagePath); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.accTlsConfig.packagePath, sizeof(config.accTlsConfig.packagePath));
+                },
+                R"pbdoc(
+                    TLS package path.
+                )pbdoc")
+            .def_property(
+                "tls_decrypter_path",
+                [](const mmc_meta_service_config_t &config) {
+                    return std::string(config.accTlsConfig.decrypterLibPath);
+                },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.accTlsConfig.decrypterLibPath, sizeof(config.accTlsConfig.decrypterLibPath));
+                },
+                R"pbdoc(
+                    TLS decrypter library path.
+                )pbdoc")
+            .def_property(
+                "config_store_tls_enable",
+                [](const mmc_meta_service_config_t &config) { return config.configStoreTlsConfig.tlsEnable; },
+                [](mmc_meta_service_config_t &config, bool value) { config.configStoreTlsConfig.tlsEnable = value; },
+                R"pbdoc(
+                    Enable TLS for config store.
+                )pbdoc")
+            .def_property(
+                "config_store_tls_ca_path",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.configStoreTlsConfig.caPath); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.configStoreTlsConfig.caPath, sizeof(config.configStoreTlsConfig.caPath));
+                },
+                R"pbdoc(
+                    Config store TLS CA certificate path.
+                )pbdoc")
+            .def_property(
+                "config_store_tls_ca_crl_path",
+                [](const mmc_meta_service_config_t &config) {
+                    return std::string(config.configStoreTlsConfig.crlPath);
+                },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.configStoreTlsConfig.crlPath, sizeof(config.configStoreTlsConfig.crlPath));
+                },
+                R"pbdoc(
+                    Config store TLS CA CRL path.
+                )pbdoc")
+            .def_property(
+                "config_store_tls_cert_path",
+                [](const mmc_meta_service_config_t &config) {
+                    return std::string(config.configStoreTlsConfig.certPath);
+                },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.configStoreTlsConfig.certPath, sizeof(config.configStoreTlsConfig.certPath));
+                },
+                R"pbdoc(
+                    Config store TLS certificate path.
+                )pbdoc")
+            .def_property(
+                "config_store_tls_key_path",
+                [](const mmc_meta_service_config_t &config) {
+                    return std::string(config.configStoreTlsConfig.keyPath);
+                },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.configStoreTlsConfig.keyPath, sizeof(config.configStoreTlsConfig.keyPath));
+                },
+                R"pbdoc(
+                    Config store TLS key path.
+                )pbdoc")
+            .def_property(
+                "config_store_tls_key_pass_path",
+                [](const mmc_meta_service_config_t &config) {
+                    return std::string(config.configStoreTlsConfig.keyPassPath);
+                },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.configStoreTlsConfig.keyPassPath,
+                             sizeof(config.configStoreTlsConfig.keyPassPath));
+                },
+                R"pbdoc(
+                    Config store TLS key passphrase path.
+                )pbdoc")
+            .def_property(
+                "config_store_tls_package_path",
+                [](const mmc_meta_service_config_t &config) {
+                    return std::string(config.configStoreTlsConfig.packagePath);
+                },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.configStoreTlsConfig.packagePath,
+                             sizeof(config.configStoreTlsConfig.packagePath));
+                },
+                R"pbdoc(
+                    Config store TLS package path.
+                )pbdoc")
+            .def_property(
+                "config_store_tls_decrypter_path",
+                [](const mmc_meta_service_config_t &config) {
+                    return std::string(config.configStoreTlsConfig.decrypterLibPath);
+                },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.configStoreTlsConfig.decrypterLibPath,
+                             sizeof(config.configStoreTlsConfig.decrypterLibPath));
+                },
+                R"pbdoc(
+                    Config store TLS decrypter library path.
+                )pbdoc");
+
+    metaConfigClass
+        .def("str", &meta_config_to_string, R"pbdoc(
+             Returns a string representation of all member variables.
+         )pbdoc")
+        .def("__str__", &meta_config_to_string, R"pbdoc(
+             Returns a string representation of all member variables.
+         )pbdoc")
+        .def("__repr__", &meta_config_to_string, R"pbdoc(
+             Returns a string representation of all member variables.
+         )pbdoc");
 }
 
 PYBIND11_MODULE(_pymmc, m)
@@ -362,6 +611,10 @@ PYBIND11_MODULE(_pymmc, m)
     py::class_<MmcMetaServiceProcess>(m, "MetaService", R"pbdoc(
          Class for memcache meta service process.
      )pbdoc")
+        .def_static(
+            "setup",
+            [](const mmc_meta_service_config_t &config) { return MmcMetaServiceProcess::getInstance().Setup(config); },
+            py::arg("config"), "Set meta service startup config.")
         .def_static(
             "main", []() { return MmcMetaServiceProcess::getInstance().MainForPython(); },
             "Start the meta service process directly. This is a blocking call.");
