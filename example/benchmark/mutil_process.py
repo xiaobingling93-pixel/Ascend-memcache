@@ -196,16 +196,17 @@ def write_worker(*args):
     print(f"\033[91mdevice_id:{device_id} write_total_size:{total_size_bytes} bytes, "
           f"single_size:{total_size_bytes / call_count:.0f} bytes, call count:{call_count}, "
           f"total_time:{duration_us:.2f} us, avg_time:{duration_us / call_count:.2f} us, "
-          f"bw:{bandwidth_gb_per_sec:.3f} GB/s\033[0m")
+          f"bw:{bandwidth_gb_per_sec:.3f} GB/s\033[0m\n")
 
+    sleep(1)
     status_manager[device_id].set_to_ready()
     for i in range(process_count):
         status_manager[i].wait_until_ready(timeout=5 * 60)
-    
+
     if PRINT_DATA_SUM:
-        print(f"write data sum for check data ==> {device_id=} {k_sum=}, {v_sum}, {one_dim_sum}")
+        print(f"write data sum for check data ==> {device_id=} {k_sum=}, {v_sum}, {one_dim_sum}\n")
     sleep(1)
-    print(f"===== npu:{device_id} write finish, wait read testing ......")
+    print(f"===== npu:{device_id} write finish, wait read testing ......\n")
     sleep(30 * 60)
 
 
@@ -311,7 +312,7 @@ def read_worker(*args):
     print(f"\033[91mdevice_id:{device_id} read_total_size:{total_size_bytes} bytes, "
           f"single_size:{total_size_bytes / call_count:.0f} bytes, call count:{call_count}, "
           f"total_time:{duration_us:.2f} us, avg_time:{duration_us / call_count:.2f} us, "
-          f"bw:{bandwidth_gb_per_sec:.3f} GB/s\033[0m")
+          f"bw:{bandwidth_gb_per_sec:.3f} GB/s\033[0m\n")
     
     sleep(1)
     if PRINT_DATA_SUM:
