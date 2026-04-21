@@ -262,12 +262,14 @@ function install_wheel_package() {
     pip3 install --dry-run --no-index --find-links "${wheel_dir}" "${wheel_package}"
     if [ $? -ne 0 ]; then
         print "ERROR" "${wheel_name} precheck install failed, keep current ${wheel_name}"
-        return
+        print "ERROR" "Maybe you should upgrade your memfabric_hybrid version"
+        exit -1
     fi
 
     pip3 install --no-deps --find-links "${wheel_dir}" --force-reinstall "${wheel_package}"
     if [ $? -ne 0 ]; then
         print "ERROR" "${wheel_name} install failed"
+        exit -1
     fi
 }
 
@@ -286,9 +288,6 @@ function install_to_path()
     cp -r ${script_dir}/uninstall.sh ${install_dir}/
     cp -r ${script_dir}/../version.info ${install_dir}/
 
-    cd ${default_install_dir}
-    ln -snf ${version1} latest
-
     pip_path=$(which pip3 2>/dev/null)
     if [ -z "$pip_path" ]; then
         print "WARNING" "pip3 Not Found, skip install wheel package."
@@ -299,6 +298,9 @@ function install_to_path()
     python_version=$(python3 -c "import sys; print(''.join(map(str, sys.version_info[:2])))")
 
     install_wheel_package "${wheel_dir}" memcache_hybrid "${python_version}"
+
+    cd ${default_install_dir}
+    ln -snf ${version1} latest
 }
 
 function generate_set_env()
