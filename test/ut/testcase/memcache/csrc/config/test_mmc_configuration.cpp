@@ -332,7 +332,7 @@ TEST_F(TestMmcConfiguration, SetupWithFullConfigTest)
     ASSERT_TRUE(ret);
 
     ASSERT_EQ(clientConfig.GetString(ConfConstant::OCK_MMC_META_SERVICE_URL), "tcp://127.0.0.1:5001");
-    ASSERT_EQ(clientConfig.GetString(ConfConstant::OCK_MMC_META_SERVICE_CONFIG_STORE_URL), "tcp://127.0.0.1:6001");
+    ASSERT_EQ(clientConfig.GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT), "tcp://127.0.0.1:6001");
     ASSERT_EQ(clientConfig.GetString(ConfConstant::OCK_MMC_LOG_LEVEL), "debug");
     ASSERT_EQ(clientConfig.GetInt(ConfConstant::OKC_MMC_LOCAL_SERVICE_WORLD_SIZE), 128UL);
     ASSERT_EQ(clientConfig.GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_PROTOCOL), "device_rdma");
